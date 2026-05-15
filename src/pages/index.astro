@@ -75,12 +75,11 @@ import '../styles/global.css';
         <article class="card media-stage crayon-texture">
           <div class="sticker sticker--green">🎤</div>
           <h2>采集声音和头像</h2>
-          <div class="camera-frame">
+          <div class="camera-frame" data-camera-frame>
             <video data-camera-preview playsinline muted autoplay></video>
             <canvas data-capture-canvas hidden></canvas>
             <div class="placeholder" data-camera-placeholder>
               <span class="placeholder-emoji">📷</span>
-              <span>打开摄像头后会显示预览，点击"咔嚓拍一张"保存头像。</span>
             </div>
           </div>
           <div class="button-row">

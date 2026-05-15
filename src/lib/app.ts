@@ -22,6 +22,7 @@ const canvas = requireEl<HTMLCanvasElement>('[data-capture-canvas]');
 const audioPlayer = requireEl<HTMLAudioElement>('[data-audio-player]');
 const profileCorner = requireEl<HTMLElement>('[data-profile-corner]');
 const cameraPlaceholder = requireEl<HTMLElement>('[data-camera-placeholder]');
+const cameraFrame = requireEl<HTMLElement>('[data-camera-frame]');
 const profileSwitchButton = requireEl<HTMLButtonElement>('[data-switch-profile]');
 const recordVoiceButton = requireEl<HTMLButtonElement>('[data-record-voice]');
 const stopVoiceButton = requireEl<HTMLButtonElement>('[data-stop-voice]');
@@ -265,6 +266,10 @@ function captureFace() {
     return;
   }
 
+  // 闪光反馈
+  cameraFrame.classList.add('flash');
+  setTimeout(() => cameraFrame.classList.remove('flash'), 350);
+
   const context = canvas.getContext('2d');
   if (!context) {
     setStatus('无法创建画布上下文。', 'error');
@@ -275,7 +280,12 @@ function captureFace() {
   const height = video.videoHeight || 480;
   canvas.width = width;
   canvas.height = height;
+  // 截图时需要翻转回来，因为视频是镜像显示的
+  context.save();
+  context.translate(width, 0);
+  context.scale(-1, 1);
   context.drawImage(video, 0, 0, width, height);
+  context.restore();
   state.faceDataUrl = canvas.toDataURL('image/jpeg', 0.92);
   canvas.toBlob((blob) => {
     state.faceBlob = blob;
