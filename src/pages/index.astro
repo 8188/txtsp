@@ -1,0 +1,119 @@
+---
+import '../styles/global.css';
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>童心调色盘</title>
+    <meta name="description" content="儿童画风的互动小站，记录声音、头像与治愈画。" />
+    <link rel="icon" href="/favicon.ico" />
+  </head>
+  <body>
+    <div class="floating-shapes" aria-hidden="true">
+      <span class="shape shape--star">✨</span>
+      <span class="shape shape--rainbow">🌈</span>
+      <span class="shape shape--cloud">☁️</span>
+      <span class="shape shape--heart">💖</span>
+      <span class="shape shape--sun">🌞</span>
+      <span class="shape shape--flower">🌸</span>
+      <span class="shape shape--balloon">🎈</span>
+    </div>
+
+    <main class="shell">
+      <div class="profile-badge" data-profile-corner hidden>
+        <span class="profile-icon">🎨</span>
+        <span class="profile-name" data-profile-summary></span>
+        <button class="button-ghost switch-btn" type="button" data-switch-profile title="切换学生">↻</button>
+        <div class="profile-tooltip">
+          <div class="tooltip-row"><strong data-profile-tooltip-name></strong></div>
+          <div class="tooltip-row" data-profile-tooltip-meta></div>
+          <div class="tooltip-row" data-profile-tooltip-id></div>
+        </div>
+      </div>
+
+      <section class="hero">
+        <p class="eyebrow">Color · Voice · Smile</p>
+        <h1 class="title">
+          <span class="title-letter" style="--i:0">童</span><span class="title-letter" style="--i:1">心</span><span class="title-letter" style="--i:2">调</span><span class="title-letter" style="--i:3">色</span><span class="title-letter" style="--i:4">盘</span>
+        </h1>
+        <p class="subtitle">用声音和小表情，画出会发光的好心情 🌈</p>
+      </section>
+
+      <section class="grid grid--main">
+        <article class="card crayon-texture" data-login-panel>
+          <div class="sticker sticker--orange">⭐</div>
+          <h2>小画家登录</h2>
+          <p class="muted">首次登录会自动生成专属 ID，信息只保存在本机浏览器中。</p>
+          <form class="form-grid" data-profile-form>
+            <label class="form-row">
+              <span>🌟 昵称</span>
+              <input name="nickname" autocomplete="nickname" placeholder="比如：小星星" required />
+            </label>
+            <label class="form-row">
+              <span>📚 年级</span>
+              <input name="grade" placeholder="一年级" required />
+            </label>
+            <label class="form-row">
+              <span>🏫 班级</span>
+              <input name="className" placeholder="1班" required />
+            </label>
+            <label class="form-row">
+              <span>🏗️ 学校</span>
+              <input name="school" placeholder="某某小学" required />
+            </label>
+            <div class="form-actions">
+              <button type="submit">🚀 登录并生成专属 ID</button>
+            </div>
+          </form>
+        </article>
+      </section>
+
+      <section class="grid grid--secondary" data-auth-section hidden>
+        <article class="card media-stage crayon-texture">
+          <div class="sticker sticker--green">🎤</div>
+          <h2>采集声音和头像</h2>
+          <div class="camera-frame">
+            <video data-camera-preview playsinline muted autoplay></video>
+            <canvas data-capture-canvas hidden></canvas>
+            <div class="placeholder" data-camera-placeholder>
+              <span class="placeholder-emoji">📷</span>
+              <span>打开摄像头后会显示预览，点击"咔嚓拍一张"保存头像。</span>
+            </div>
+          </div>
+          <div class="button-row">
+            <button type="button" data-record-voice>🎤 录下声音</button>
+            <button type="button" class="button-ghost" data-stop-voice disabled>⏸ 停一下</button>
+            <button type="button" class="button-secondary" data-capture-face>📸 咔嚓拍一张</button>
+          </div>
+          <audio data-audio-player controls hidden></audio>
+        </article>
+
+        <article class="card result-box crayon-texture">
+          <div class="sticker sticker--violet">✨</div>
+          <h2>魔法结果</h2>
+          <div class="button-row">
+            <button type="button" data-run-encouragement>💖 召唤鼓励话</button>
+            <button type="button" class="button-secondary" data-run-artwork>🎨 画出治愈画</button>
+          </div>
+          <p class="result-encouragement" data-result-encouragement>先点按钮，魔法马上来 ✨</p>
+          <div class="encouragement-audio">
+            <h3>🔊 鼓励语音</h3>
+            <audio data-encouragement-player controls hidden></audio>
+          </div>
+          <img class="result-image" data-result-image hidden alt="Coze 工作流返回的治愈画" />
+        </article>
+      </section>
+
+      <footer class="page-footer">
+        <span>Made with 💛 by 童心调色盘</span>
+      </footer>
+    </main>
+
+    <script>
+      import '../lib/app.ts';
+    </script>
+  </body>
+</html>
