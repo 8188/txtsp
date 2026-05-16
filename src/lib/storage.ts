@@ -4,8 +4,20 @@ const PROFILE_KEY = 'tongxin.profile';
 const HISTORY_KEY = 'tongxin.history';
 const PROFILE_MAP_KEY = 'tongxin.profile.map';
 
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for browsers that don't support crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export function createStudentUuid() {
-  return `stu_${crypto.randomUUID()}`;
+  return `stu_${generateUUID()}`;
 }
 
 type ProfileMap = Record<string, string>;

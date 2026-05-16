@@ -133,8 +133,8 @@ async function handleProfileSubmit(event: SubmitEvent) {
   const className = profileFields.className.value.trim();
   const school = profileFields.school.value.trim();
 
-  if (!nickname || !grade || !className || !school) {
-    setStatus('请先填写完整的学生信息。', 'error');
+  if (!nickname) {
+    setStatus('请至少填写姓名。', 'error');
     return;
   }
 
@@ -178,35 +178,36 @@ function switchProfile() {
 
 async function autoRestoreMedia() {
   if (!state.profile) return;
+  if (!navigator.mediaDevices?.getUserMedia) return;
   try {
     await enableMedia();
   } catch {
-    // ignore silent restore failures; the explicit button will surface the error.
+    // ignore silent restore failures
   }
 }
 
 async function enableMedia() {
-  try {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('当前浏览器不支持摄像头或麦克风。');
-    }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    setStatus('当前浏览器不支持摄像头或麦克风，你仍可使用其他功能。', 'error');
+    return false;
+  }
 
+  try {
     state.mediaStream?.getTracks().forEach((track) => track.stop());
     state.mediaStream = await navigator.mediaDevices.getUserMedia({
       audio: true,
       video: {
-        facingMode: 'user',
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
+        facingMode: 'user'
       }
     });
     video.srcObject = state.mediaStream;
     await video.play();
     cameraPlaceholder.hidden = true;
+    return true;
   } catch (error) {
     const message = error instanceof Error ? error.message : '无法启用媒体设备。';
     setStatus(message, 'error');
-    throw error;
+    return false;
   }
 }
 
