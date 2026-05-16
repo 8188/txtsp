@@ -1,4 +1,4 @@
-import { extractAudioUrl, extractEncouragement, extractFileUrl, extractImageUrl, runArtworkWorkflow, runEncouragementWorkflow, fileToBlobFile, uploadCozeFile } from './coze';
+import { extractAudioUrl, extractEncouragement, extractFileUrl, extractImageUrl, extractMood, runArtworkWorkflow, runEncouragementWorkflow, fileToBlobFile, uploadCozeFile } from './coze';
 import { getOrCreateStudentUuid, loadProfile, saveProfile, clearProfile } from './storage';
 import { saveLogToFile } from './logger';
 import type { StudentProfile, WorkflowRecord } from './types';
@@ -16,6 +16,7 @@ const loginPanel = requireEl<HTMLElement>('[data-login-panel]');
 const profileSummary = requireEl<HTMLElement>('[data-profile-summary]');
 const resultEncouragement = requireEl<HTMLElement>('[data-result-encouragement]');
 const resultImage = requireEl<HTMLImageElement>('[data-result-image]');
+const resultMood = document.querySelector<HTMLElement>('[data-result-mood]');
 const historyList = document.querySelector<HTMLElement>('[data-history-list]');
 const video = requireEl<HTMLVideoElement>('[data-camera-preview]');
 const canvas = requireEl<HTMLCanvasElement>('[data-capture-canvas]');
@@ -64,12 +65,24 @@ artworkButton.addEventListener('click', runArtwork);
 void autoRestoreMedia();
 
 function setStatus(message: string, tone: 'default' | 'success' | 'error' = 'default') {
-  // Status banner is removed from UI; only log to console for debugging.
   if (!message) return;
-  if (tone === 'error') {
-    console.warn('[状态]', message);
-  } else {
+  if (tone === 'success') {
     console.log('[状态]', message);
+    return;
+  }
+  resultEncouragement.textContent = message;
+  resultEncouragement.dataset.tone = tone;
+}
+
+function showLoading() {
+  resultEncouragement.dataset.loading = 'true';
+}
+
+function hideLoading() {
+  delete resultEncouragement.dataset.loading;
+  if (resultEncouragement.dataset.tone !== 'error') {
+    resultEncouragement.textContent = '先点按钮，魔法马上来 ✨';
+    delete resultEncouragement.dataset.tone;
   }
 }
 
@@ -304,6 +317,7 @@ async function runEncouragement() {
   encourageButton.disabled = true;
   artworkButton.disabled = true;
   setStatus('正在调用鼓励工作流...');
+  showLoading();
 
   try {
     const payload = await runEncouragementWorkflow(state.profile.studentUuid);
@@ -339,6 +353,7 @@ async function runEncouragement() {
     });
     setStatus(message, 'error');
   } finally {
+    hideLoading();
     state.busy = false;
     encourageButton.disabled = false;
     artworkButton.disabled = false;
@@ -351,13 +366,8 @@ async function runArtwork() {
     return;
   }
 
-  if (!state.voiceDataUrl) {
-    setStatus('请先录制语音。', 'error');
-    return;
-  }
-
-  if (!state.faceDataUrl) {
-    setStatus('请先拍摄头像。', 'error');
+  if (!state.voiceDataUrl && !state.faceDataUrl) {
+    setStatus('请先录下声音或拍一张头像，至少完成一项即可。', 'error');
     return;
   }
 
@@ -366,32 +376,43 @@ async function runArtwork() {
   encourageButton.disabled = true;
   artworkButton.disabled = true;
   setStatus('正在调用治愈画工作流...');
+  showLoading();
 
   try {
-    const voiceFile = await fileToBlobFile(state.voiceBlob || dataUrlToBlob(state.voiceDataUrl), `voice-${state.profile.studentUuid}.webm`);
-    const faceFile = await fileToBlobFile(state.faceBlob || dataUrlToBlob(state.faceDataUrl), `face-${state.profile.studentUuid}.jpg`);
-
-    const [voiceUpload, faceUpload] = await Promise.all([
-      uploadCozeFile(voiceFile),
-      uploadCozeFile(faceFile)
-    ]);
-
-    const voiceInput = extractFileUrl(voiceUpload) || String((voiceUpload as { id?: string }).id || '');
-    const rawFaceInput = extractFileUrl(faceUpload) || String((faceUpload as { id?: string }).id || '');
-
-    if (!voiceInput) {
-      throw new Error('语音文件上传后没有可用的 file_id。');
+    const files: File[] = [];
+    if (state.voiceBlob || state.voiceDataUrl) {
+      files.push(await fileToBlobFile(state.voiceBlob || dataUrlToBlob(state.voiceDataUrl), `voice-${state.profile.studentUuid}.webm`));
+    }
+    if (state.faceBlob || state.faceDataUrl) {
+      files.push(await fileToBlobFile(state.faceBlob || dataUrlToBlob(state.faceDataUrl), `face-${state.profile.studentUuid}.jpg`));
     }
 
-    if (!rawFaceInput) {
-      throw new Error('头像文件上传后没有可用的 URL 或 file_id。');
+    const uploadResults = await Promise.all(files.map(f => uploadCozeFile(f)));
+    const uploadMap = uploadResults.reduce<Record<string, unknown>>((acc, res, i) => {
+      const file = files[i];
+      const key = file.name.startsWith('voice') ? 'voice' : 'face';
+      acc[key] = extractFileUrl(res) || String((res as { id?: string }).id || '');
+      return acc;
+    }, {});
+
+    const voiceInput = String(uploadMap.voice || '');
+    const rawFaceInput = String(uploadMap.face || '');
+
+    if (voiceInput && state.voiceBlob) {
+      if (!voiceInput) {
+        throw new Error('语音文件上传后没有可用的 file_id。');
+      }
+    }
+    if (rawFaceInput && state.faceBlob) {
+      if (!rawFaceInput) {
+        throw new Error('头像文件上传后没有可用的 URL 或 file_id。');
+      }
     }
 
     // 根据 Coze 文档，Image 类型的参数需要传入文件 URL 或 stringified JSON 的 file_id
-    // 单文件格式示例: "{\"file_id\":\"1122334455\"}"
-    const faceParam = /^https?:\/\//i.test(rawFaceInput)
+    const faceParam = rawFaceInput && /^https?:\/\//i.test(rawFaceInput)
       ? rawFaceInput
-      : JSON.stringify({ file_id: rawFaceInput });
+      : rawFaceInput ? JSON.stringify({ file_id: rawFaceInput }) : '';
 
     const parameters = {
       student_uuid: state.profile.studentUuid,
@@ -408,15 +429,28 @@ async function runArtwork() {
     });
     console.log('Artwork workflow raw result:', payload);
     const imageUrl = validateImageUrl(extractImageUrl(payload));
+    const mood = extractMood(payload).trim();
     if (!imageUrl) {
       throw new Error('工作流返回了空图片地址，请确认工作流最终节点输出了 image_url。');
     }
     resultImage.src = imageUrl;
     resultImage.hidden = false;
+
+    if (mood) {
+      resultMood!.textContent = mood;
+      const moodDisplay = resultMood!.closest<HTMLElement>('.mood-display');
+      if (moodDisplay) moodDisplay.hidden = false;
+    } else {
+      if (resultMood) resultMood.textContent = '';
+      const moodDisplay = resultMood?.closest<HTMLElement>('.mood-display');
+      if (moodDisplay) moodDisplay.hidden = true;
+    }
+
     appendRecord({
       kind: 'artwork',
       promptSummary: `student_uuid = ${state.profile.studentUuid}`,
       imageUrl,
+      mood: mood || undefined,
       voiceDataUrl: state.voiceDataUrl,
       faceDataUrl: state.faceDataUrl,
       status: 'success'
@@ -435,11 +469,39 @@ async function runArtwork() {
     });
     setStatus(message, 'error');
   } finally {
+    hideLoading();
     state.busy = false;
     encourageButton.disabled = false;
     artworkButton.disabled = false;
   }
 }
+
+// 图片全屏灯箱
+const lightbox = requireEl<HTMLElement>('[data-lightbox]');
+const lightboxImg = requireEl<HTMLImageElement>('[data-lightbox-img]');
+const lightboxCloseButtons = Array.from(document.querySelectorAll<HTMLElement>('[data-lightbox-close]'));
+
+resultImage.addEventListener('click', () => {
+  if (!resultImage.src || resultImage.hidden) return;
+  lightboxImg.src = resultImage.src;
+  lightbox.hidden = false;
+  document.body.style.overflow = 'hidden';
+});
+
+lightboxCloseButtons.forEach(btn => {
+  btn.addEventListener('click', closeLightbox);
+});
+
+function closeLightbox() {
+  lightbox.hidden = true;
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !lightbox.hidden) {
+    closeLightbox();
+  }
+});
 
 function appendRecord(record: Omit<WorkflowRecord, 'id' | 'createdAt' | 'studentUuid'>) {
   const nextRecord: WorkflowRecord = {

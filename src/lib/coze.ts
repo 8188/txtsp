@@ -187,6 +187,13 @@ export function extractImageUrl(payload: WorkflowResponsePayload) {
   return findStringValue(payload, ['image_url', 'imageUrl', 'url', 'link', 'result', 'output']);
 }
 
+export function extractMood(payload: WorkflowResponsePayload) {
+  if (!payload) return '';
+  if (typeof payload === 'string') return payload.trim();
+
+  return findStringValue(payload, ['mood', 'str_mood', 'emotion']);
+}
+
 export function extractFileUrl(fileObject: unknown) {
   if (!fileObject || typeof fileObject !== 'object') {
     return '';

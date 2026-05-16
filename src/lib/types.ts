@@ -16,6 +16,7 @@ export type WorkflowRecord = {
   promptSummary: string;
   encouragement?: string;
   imageUrl?: string;
+  mood?: string;
   voiceDataUrl?: string;
   faceDataUrl?: string;
   status: 'success' | 'failed';

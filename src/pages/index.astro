@@ -103,6 +103,10 @@ import '../styles/global.css';
             <audio data-encouragement-player controls hidden></audio>
           </div>
           <img class="result-image" data-result-image hidden alt="Coze 工作流返回的治愈画" />
+          <div class="mood-display" hidden>
+            <span class="mood-icon">💡</span>
+            <span class="mood-text" data-result-mood></span>
+          </div>
         </article>
       </section>
 
@@ -110,6 +114,13 @@ import '../styles/global.css';
         <span>Made with 💛 by 童心调色盘</span>
       </footer>
     </main>
+
+    <!-- 图片全屏灯箱 -->
+    <div class="lightbox" data-lightbox hidden>
+      <div class="lightbox-bg" data-lightbox-close></div>
+      <img class="lightbox-img" data-lightbox-img alt="治愈画全屏" />
+      <button class="lightbox-close" data-lightbox-close type="button">✕</button>
+    </div>
 
     <script>
       import '../lib/app.ts';
