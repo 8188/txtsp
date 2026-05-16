@@ -73,8 +73,8 @@ import '../styles/global.css';
 
       <section class="grid grid--secondary" data-auth-section hidden>
         <article class="card media-stage crayon-texture">
-          <div class="sticker sticker--green">🎤</div>
-          <h2>采集声音和头像</h2>
+          <div class="sticker sticker--green">📷</div>
+          <h2>采集头像</h2>
           <div class="camera-frame" data-camera-frame>
             <video data-camera-preview playsinline muted autoplay></video>
             <canvas data-capture-canvas hidden></canvas>
@@ -83,11 +83,8 @@ import '../styles/global.css';
             </div>
           </div>
           <div class="button-row">
-            <button type="button" data-record-voice>🎤 录下声音</button>
-            <button type="button" class="button-ghost" data-stop-voice disabled>⏸ 停一下</button>
             <button type="button" class="button-secondary" data-capture-face>📸 咔嚓拍一张</button>
           </div>
-          <audio data-audio-player controls hidden></audio>
         </article>
 
         <article class="card result-box crayon-texture">

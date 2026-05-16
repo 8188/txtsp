@@ -149,12 +149,11 @@ export async function runEncouragementWorkflow(studentUuid: string) {
   return runWorkflow({ student_uuid: studentUuid }, encourageWorkflowId);
 }
 
-export async function runArtworkWorkflow(payload: { studentUuid: string; voice: string; face: string }) {
+export async function runArtworkWorkflow(payload: { studentUuid: string; face: string }) {
   const { artworkWorkflowId } = getWorkflowIds();
   return runWorkflow(
     {
       student_uuid: payload.studentUuid,
-      voice: payload.voice,
       face: payload.face
     },
     artworkWorkflowId

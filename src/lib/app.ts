@@ -20,13 +20,10 @@ const resultMood = document.querySelector<HTMLElement>('[data-result-mood]');
 const historyList = document.querySelector<HTMLElement>('[data-history-list]');
 const video = requireEl<HTMLVideoElement>('[data-camera-preview]');
 const canvas = requireEl<HTMLCanvasElement>('[data-capture-canvas]');
-const audioPlayer = requireEl<HTMLAudioElement>('[data-audio-player]');
 const profileCorner = requireEl<HTMLElement>('[data-profile-corner]');
 const cameraPlaceholder = requireEl<HTMLElement>('[data-camera-placeholder]');
 const cameraFrame = requireEl<HTMLElement>('[data-camera-frame]');
 const profileSwitchButton = requireEl<HTMLButtonElement>('[data-switch-profile]');
-const recordVoiceButton = requireEl<HTMLButtonElement>('[data-record-voice]');
-const stopVoiceButton = requireEl<HTMLButtonElement>('[data-stop-voice]');
 const captureFaceButton = requireEl<HTMLButtonElement>('[data-capture-face]');
 const encourageButton = requireEl<HTMLButtonElement>('[data-run-encouragement]');
 const artworkButton = requireEl<HTMLButtonElement>('[data-run-artwork]');
@@ -43,9 +40,6 @@ const profileFields = profileForm.elements as typeof profileForm.elements & {
 const state = {
   profile: loadProfile() as StudentProfile | null,
   mediaStream: null as MediaStream | null,
-  mediaRecorder: null as MediaRecorder | null,
-  voiceBlob: null as Blob | null,
-  voiceDataUrl: '',
   faceDataUrl: '',
   faceBlob: null as Blob | null,
   busy: false
@@ -56,8 +50,6 @@ setStatus('准备就绪，先登录再开始。');
 
 profileForm.addEventListener('submit', handleProfileSubmit);
 profileSwitchButton.addEventListener('click', switchProfile);
-recordVoiceButton.addEventListener('click', startVoiceRecording);
-stopVoiceButton.addEventListener('click', stopVoiceRecording);
 captureFaceButton.addEventListener('click', captureFace);
 encourageButton.addEventListener('click', runEncouragement);
 artworkButton.addEventListener('click', runArtwork);
@@ -158,12 +150,9 @@ async function handleProfileSubmit(event: SubmitEvent) {
 function switchProfile() {
   state.mediaStream?.getTracks().forEach((track) => track.stop());
   state.mediaStream = null;
-  state.mediaRecorder = null;
   video.srcObject = null;
   cameraPlaceholder.hidden = false;
-  state.voiceBlob = null;
   state.faceBlob = null;
-  state.voiceDataUrl = '';
   state.faceDataUrl = '';
   encouragementAudio.src = '';
   encouragementAudio.hidden = true;
@@ -188,14 +177,13 @@ async function autoRestoreMedia() {
 
 async function enableMedia() {
   if (!navigator.mediaDevices?.getUserMedia) {
-    setStatus('当前浏览器不支持摄像头或麦克风，你仍可使用其他功能。', 'error');
+    setStatus('当前浏览器不支持摄像头，你仍可使用其他功能。', 'error');
     return false;
   }
 
   try {
     state.mediaStream?.getTracks().forEach((track) => track.stop());
     state.mediaStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
       video: {
         facingMode: 'user'
       }
@@ -205,73 +193,10 @@ async function enableMedia() {
     cameraPlaceholder.hidden = true;
     return true;
   } catch (error) {
-    const message = error instanceof Error ? error.message : '无法启用媒体设备。';
+    const message = error instanceof Error ? error.message : '无法启用摄像头。';
     setStatus(message, 'error');
     return false;
   }
-}
-
-async function startVoiceRecording() {
-  if (!state.mediaStream) {
-    await enableMedia();
-  }
-
-  if (!state.mediaStream) return;
-
-  const audioTracks = state.mediaStream.getAudioTracks();
-  if (!audioTracks.length) {
-    setStatus('当前设备没有可用的麦克风轨道。', 'error');
-    return;
-  }
-
-  state.voiceBlob = null;
-  state.voiceDataUrl = '';
-  const audioOnlyStream = new MediaStream(audioTracks);
-  const mimeType = pickAudioMimeType();
-  let recorder: MediaRecorder;
-
-  try {
-    recorder = mimeType ? new MediaRecorder(audioOnlyStream, { mimeType }) : new MediaRecorder(audioOnlyStream);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '无法创建录音器。';
-    setStatus(message, 'error');
-    return;
-  }
-
-  const chunks: BlobPart[] = [];
-  recorder.addEventListener('dataavailable', (event) => {
-    if (event.data.size > 0) {
-      chunks.push(event.data);
-    }
-  });
-  recorder.addEventListener('stop', async () => {
-    state.voiceBlob = new Blob(chunks, { type: recorder.mimeType });
-    state.voiceDataUrl = await blobToDataUrl(state.voiceBlob);
-    audioPlayer.src = state.voiceDataUrl;
-    audioPlayer.hidden = false;
-    setStatus('语音已保存，可以开始调用工作流。', 'success');
-  });
-
-  try {
-    recorder.start();
-  } catch (error) {
-    const message = error instanceof Error ? error.message : '录音启动失败。';
-    setStatus(message, 'error');
-    return;
-  }
-
-  state.mediaRecorder = recorder;
-  recordVoiceButton.disabled = true;
-  stopVoiceButton.disabled = false;
-  setStatus('正在录制语音。');
-}
-
-function stopVoiceRecording() {
-  if (!state.mediaRecorder || state.mediaRecorder.state === 'inactive') return;
-  state.mediaRecorder.stop();
-  state.mediaRecorder = null;
-  recordVoiceButton.disabled = false;
-  stopVoiceButton.disabled = true;
 }
 
 function captureFace() {
@@ -367,8 +292,8 @@ async function runArtwork() {
     return;
   }
 
-  if (!state.voiceDataUrl && !state.faceDataUrl) {
-    setStatus('请先录下声音或拍一张头像，至少完成一项即可。', 'error');
+  if (!state.faceDataUrl) {
+    setStatus('请先拍一张头像。', 'error');
     return;
   }
 
@@ -380,52 +305,22 @@ async function runArtwork() {
   showLoading();
 
   try {
-    const files: File[] = [];
-    if (state.voiceBlob || state.voiceDataUrl) {
-      files.push(await fileToBlobFile(state.voiceBlob || dataUrlToBlob(state.voiceDataUrl), `voice-${state.profile.studentUuid}.webm`));
-    }
-    if (state.faceBlob || state.faceDataUrl) {
-      files.push(await fileToBlobFile(state.faceBlob || dataUrlToBlob(state.faceDataUrl), `face-${state.profile.studentUuid}.jpg`));
-    }
+    const faceFile = await fileToBlobFile(state.faceBlob || dataUrlToBlob(state.faceDataUrl), `face-${state.profile.studentUuid}.jpg`);
+    const faceUpload = await uploadCozeFile(faceFile);
+    const rawFaceInput = extractFileUrl(faceUpload) || String((faceUpload as { id?: string }).id || '');
 
-    const uploadResults = await Promise.all(files.map(f => uploadCozeFile(f)));
-    const uploadMap = uploadResults.reduce<Record<string, unknown>>((acc, res, i) => {
-      const file = files[i];
-      const key = file.name.startsWith('voice') ? 'voice' : 'face';
-      acc[key] = extractFileUrl(res) || String((res as { id?: string }).id || '');
-      return acc;
-    }, {});
-
-    const voiceInput = String(uploadMap.voice || '');
-    const rawFaceInput = String(uploadMap.face || '');
-
-    if (voiceInput && state.voiceBlob) {
-      if (!voiceInput) {
-        throw new Error('语音文件上传后没有可用的 file_id。');
-      }
-    }
-    if (rawFaceInput && state.faceBlob) {
-      if (!rawFaceInput) {
-        throw new Error('头像文件上传后没有可用的 URL 或 file_id。');
-      }
+    if (!rawFaceInput) {
+      throw new Error('头像文件上传后没有可用的 URL 或 file_id。');
     }
 
-    // 根据 Coze 文档，Image 类型的参数需要传入文件 URL 或 stringified JSON 的 file_id
-    const faceParam = rawFaceInput && /^https?:\/\//i.test(rawFaceInput)
+    const faceParam = /^https?:\/\//i.test(rawFaceInput)
       ? rawFaceInput
-      : rawFaceInput ? JSON.stringify({ file_id: rawFaceInput }) : '';
+      : JSON.stringify({ file_id: rawFaceInput });
 
-    const parameters = {
-      student_uuid: state.profile.studentUuid,
-      voice: voiceInput,
-      face: faceParam
-    } as Record<string, unknown>;
-
-    console.log('Calling artwork workflow with parameters:', parameters);
+    console.log('Calling artwork workflow with parameters:', { student_uuid: state.profile.studentUuid, face: faceParam });
 
     const payload = await runArtworkWorkflow({
       studentUuid: state.profile.studentUuid,
-      voice: String(voiceInput),
       face: String(faceParam)
     });
     console.log('Artwork workflow raw result:', payload);
@@ -452,7 +347,6 @@ async function runArtwork() {
       promptSummary: `student_uuid = ${state.profile.studentUuid}`,
       imageUrl,
       mood: mood || undefined,
-      voiceDataUrl: state.voiceDataUrl,
       faceDataUrl: state.faceDataUrl,
       status: 'success'
     });
@@ -465,7 +359,6 @@ async function runArtwork() {
       promptSummary: `student_uuid = ${state.profile.studentUuid}`,
       status: 'failed',
       errorMessage: message,
-      voiceDataUrl: state.voiceDataUrl,
       faceDataUrl: state.faceDataUrl
     });
     setStatus(message, 'error');
@@ -577,20 +470,6 @@ function dataUrlToBlob(dataUrl: string) {
     bytes[index] = binary.charCodeAt(index);
   }
   return new Blob([bytes], { type: mimeType });
-}
-
-async function blobToDataUrl(blob: Blob) {
-  return await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ''));
-    reader.onerror = () => reject(new Error('无法读取录音文件。'));
-    reader.readAsDataURL(blob);
-  });
-}
-
-function pickAudioMimeType() {
-  const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
-  return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) || '';
 }
 
 function formatDate(dateString: string) {
