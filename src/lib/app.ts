@@ -1,4 +1,4 @@
-import { extractAudioUrl, extractEncouragement, extractFileUrl, extractImageUrl, extractMood, runArtworkWorkflow, runEncouragementWorkflow, fileToBlobFile, uploadCozeFile } from './coze';
+import { extractAudioUrl, extractEncouragement, extractFileUrl, extractImageUrl, extractMood, extractDesc, runArtworkWorkflow, runEncouragementWorkflow, fileToBlobFile, uploadCozeFile } from './coze';
 import { getOrCreateStudentUuid, loadProfile, saveProfile, clearProfile } from './storage';
 import { saveLogToFile } from './logger';
 import type { StudentProfile, WorkflowRecord } from './types';
@@ -326,6 +326,26 @@ async function runArtwork() {
     console.log('Artwork workflow raw result:', payload);
     const imageUrl = validateImageUrl(extractImageUrl(payload));
     const mood = extractMood(payload).trim();
+    const desc = extractDesc(payload).trim();
+
+    // desc 安全校验（在展示图片前拦截）
+    if (desc) {
+      try {
+        validateArtworkDesc(desc);
+      } catch (descError) {
+        const message = descError instanceof Error ? descError.message : '治愈画内容未通过儿童安全校验。';
+        appendRecord({
+          kind: 'artwork',
+          promptSummary: `student_uuid = ${state.profile.studentUuid}`,
+          status: 'failed',
+          errorMessage: message,
+          faceDataUrl: state.faceDataUrl
+        });
+        setStatus(message, 'error');
+        return;
+      }
+    }
+
     if (!imageUrl) {
       throw new Error('工作流返回了空图片地址，请确认工作流最终节点输出了 image_url。');
     }
@@ -408,22 +428,36 @@ function appendRecord(record: Omit<WorkflowRecord, 'id' | 'createdAt' | 'student
   void saveLogToFile(nextRecord);
 }
 
+function validateChildSafeText(label: string, text: string) {
+  const value = text.trim();
+  if (!value) {
+    return value;
+  }
+
+  const blockedWords = ['成人', '暴力', '赌博', '色情', '违法'];
+  if (blockedWords.some((word) => value.includes(word))) {
+    throw new Error(`${label}包含不适合儿童的内容，已拦截。`);
+  }
+
+  if (value.length > 800) {
+    return `${value.slice(0, 800)}…`;
+  }
+
+  return value;
+}
+
 function validateEncouragement(text: string) {
   const value = text.trim();
   if (!value) {
     throw new Error('工作流返回了空的鼓励内容。');
   }
+  return validateChildSafeText('鼓励内容', value);
+}
 
-  if (value.length > 500) {
-    return `${value.slice(0, 500)}…`;
-  }
-
-  const blockedWords = ['成人', '暴力', '赌博', '色情', '违法'];
-  if (blockedWords.some((word) => value.includes(word))) {
-    throw new Error('鼓励内容未通过儿童安全校验。');
-  }
-
-  return value;
+function validateArtworkDesc(text: string) {
+  const value = text.trim();
+  if (!value) return value; // desc is optional, empty is fine
+  return validateChildSafeText('治愈画描述', value);
 }
 
 function validateAudioUrl(url: string) {

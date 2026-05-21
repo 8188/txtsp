@@ -193,6 +193,13 @@ export function extractMood(payload: WorkflowResponsePayload) {
   return findStringValue(payload, ['mood', 'str_mood', 'emotion']);
 }
 
+export function extractDesc(payload: WorkflowResponsePayload) {
+  if (!payload) return '';
+  if (typeof payload === 'string') return payload.trim();
+
+  return findStringValue(payload, ['desc', 'description', 'str_desc', 'summary']);
+}
+
 export function extractFileUrl(fileObject: unknown) {
   if (!fileObject || typeof fileObject !== 'object') {
     return '';
